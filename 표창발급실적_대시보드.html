@@ -1,0 +1,1219 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>2026년 표창 발급 실적 대시보드</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains Mono:wght@400;600;700&display=swap" rel="stylesheet"><script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script><style>
+  :root {
+    --bg:        #eef2f7;
+    --surface:   #ffffff;
+    --surface2:  #f4f7fb;
+    --surface3:  #e8edf5;
+    --border:    #ccd6e8;
+    --accent:    #2563eb;
+    --accent2:   #059669;
+    --accent3:   #d97706;
+    --text:      #1e293b;
+    --text-muted:#57687f;
+    --header-h:  68px;
+    --radius:    14px;
+    --shadow:    0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.06);
+    --glow:      0 0 0 3px rgba(37,99,235,.12);
+  }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; font-size:17.5px; }
+  body {
+    font-family:'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.55;
+  }
+
+  /* Header */
+  header {
+    height: var(--header-h);
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 32px;
+    position:sticky; top:0; z-index:200;
+    box-shadow: 0 1px 8px rgba(0,0,0,.06);
+  }
+  .header-left { display:flex; align-items:center; gap:12px; }
+  .header-icon {
+    width:38px; height:38px; border-radius:10px;
+    background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.15rem; box-shadow:0 2px 8px rgba(37,99,235,.3); flex-shrink:0;
+  }
+  header h1 { font-size:1.05rem; font-weight:700; color:var(--text); letter-spacing:-.3px; }
+  .beta-tag {
+    font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:700;
+    background:rgba(37,99,235,.1); color:var(--accent);
+    border:1px solid rgba(37,99,235,.25); padding:2px 9px; border-radius:20px; letter-spacing:.5px;
+  }
+  .header-right { display:flex; align-items:center; gap:10px; }
+  .chip {
+    display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px;
+    font-size:.82rem; font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+    border:1px solid var(--border); background:var(--surface2); color:var(--text); transition:all .2s;
+  }
+  .chip:hover { border-color:var(--accent); background:rgba(37,99,235,.06); color:var(--accent); }
+  .chip.primary {
+    background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);
+    border-color:transparent; color:#fff; font-weight:600;
+    box-shadow:0 2px 10px rgba(37,99,235,.28);
+  }
+  .chip.primary:hover { opacity:.9; }
+  .chip.primary:disabled { opacity:.4; cursor:not-allowed; }
+  #excelInput { display:none; }
+
+  /* Stat bar */
+  #stat-bar {
+    display: none;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    padding: 20px 32px 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 14px clamp(12px, 2.2vw, 36px);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background .2s, box-shadow .2s;
+    box-shadow: var(--shadow);
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-align: center;
+  }
+  .stat-card:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .stat-card:last-child  { border-radius: 0 var(--radius) var(--radius) 0; }
+  .stat-card + .stat-card { border-left: none; }
+  .stat-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,var(--accent) 0%,var(--accent2) 100%);
+    opacity:0; transition:opacity .2s;
+  }
+  .stat-card:hover { background:var(--surface2); box-shadow:var(--glow); }
+  .stat-card:hover::before { opacity:1; }
+
+  .stat-card .lbl {
+    font-size: clamp(.65rem, 1.1vw, .82rem);
+    color: var(--text-muted); font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .stat-card .val-row {
+    display: flex; align-items: baseline; gap: 4px;
+    white-space: nowrap;
+  }
+  .stat-card .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(1.3rem, 2.8vw, 2.1rem);
+    font-weight: 700; color: var(--accent); line-height: 1;
+    animation: countUp .5s ease-out;
+  }
+  .stat-card .sub {
+    font-size: clamp(.72rem, 1vw, .88rem);
+    color: var(--text-muted); font-weight: 500; white-space: nowrap;
+  }
+  @keyframes countUp { from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;} }
+
+  /* Empty state */
+  #empty-state {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:calc(100vh - var(--header-h) - 40px); gap:16px; color:var(--text-muted);
+  }
+  .empty-icon {
+    width:76px; height:76px; border-radius:20px; background:var(--surface);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    font-size:2.2rem; animation:float 3s ease-in-out infinite;
+    box-shadow: var(--shadow);
+  }
+  @keyframes float { 0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);} }
+  #empty-state p { font-size:.95rem; color:var(--text-muted); }
+  #empty-state strong { color:var(--accent); }
+
+  /* Dashboard */
+  #dashboard { display:none; padding:22px 32px 60px; }
+  .section-title {
+    font-size:.76rem; font-weight:700; text-transform:uppercase; letter-spacing:1.8px;
+    color:var(--text-muted); margin-bottom:14px; display:flex; align-items:center; gap:10px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .chart-card.full { grid-column:1/-1; }
+  .chart-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    overflow:hidden; transition:border-color .2s, box-shadow .2s;
+    box-shadow: var(--shadow);
+  }
+  .chart-card:hover { border-color:rgba(37,99,235,.3); box-shadow:0 4px 20px rgba(37,99,235,.1); }
+  .chart-header {
+    padding:15px 22px 13px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; background:var(--surface2);
+  }
+  .chart-header .indicator { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .chart-header h2 { font-size:.95rem; font-weight:700; color:var(--text); }
+  .chart-tag {
+    font-size:.74rem; font-family:'JetBrains Mono',monospace;
+    color:var(--text-muted); background:var(--surface3); padding:3px 9px;
+    border-radius:5px; border:1px solid var(--border); font-weight:600;
+  }
+
+  .chart-header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chart-dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 11px;
+    font-size: .75rem;
+    font-weight: 600;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .chart-dl-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(37,99,235,.06);
+  }
+  .chart-dl-btn.excel-btn:hover {
+    color: var(--accent2);
+    border-color: var(--accent2);
+    background: rgba(5,150,105,.06);
+  }
+
+  .chart-body { padding:18px 20px; }
+  .chart-div        { width:100%; height:clamp(300px,36vw,450px); }
+  .chart-div.tall   { height:clamp(320px,38vw,480px); }
+  .chart-div.race   { height:clamp(380px,42vw,520px); }
+  .chart-div.month  { height:clamp(280px,32vw,400px); }
+
+  /* 차트 좌우 스크롤 래퍼: 모바일에서 항목이 많은 차트가 눌려 보이지 않도록
+     내부 차트에 최소 폭을 부여하고, 이 래퍼가 대신 가로 스크롤됨 (표 스크롤과 동일한 방식) */
+  .chart-scroll-x {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chart-scroll-x .chart-div { flex-shrink: 0; }
+  .mobile-scroll-hint {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: .74rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0 20px 10px;
+  }
+
+  /* 차트 데이터 표 스타일 */
+  .chart-table-wrap {
+    margin-top: 14px;
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .chart-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+    text-align: center;
+  }
+  .chart-data-table th {
+    background: var(--surface2);
+    color: var(--text);
+    padding: 8px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .chart-data-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .chart-data-table tr:last-child td { border-bottom: none; }
+  .chart-data-table tr:nth-child(even) { background: rgba(244,247,251,.6); }
+  .chart-data-table .num-col { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+  /* Race Controls */
+  .race-controls {
+    display:flex; align-items:center; gap:10px; padding:10px 22px 13px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border); background:var(--surface2);
+  }
+  .race-btn {
+    display:inline-flex; align-items:center; gap:5px; padding:6px 16px;
+    border-radius:7px; font-size:.82rem; font-family:'Noto Sans KR',sans-serif;
+    cursor:pointer; border:1px solid var(--border); background:var(--surface);
+    color:var(--text); transition:all .18s; font-weight:500;
+  }
+  .race-btn:hover { border-color:var(--accent); color:var(--accent); background:rgba(37,99,235,.06); }
+  .race-btn.active { background:rgba(37,99,235,.1); border-color:var(--accent); color:var(--accent); font-weight:700; }
+  .race-month-label {
+    font-family:'JetBrains Mono',monospace; font-size:.88rem; font-weight:700;
+    color:var(--accent3); padding:4px 14px; border-radius:7px;
+    background:rgba(217,119,6,.08); border:1px solid rgba(217,119,6,.3);
+    min-width:80px; text-align:center;
+  }
+  .race-speed-label { font-size:.78rem; color:var(--text-muted); font-weight:500; }
+  .race-speed-select {
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:5px 10px; font-size:.78rem;
+    font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+  }
+
+  /* Legend */
+  .legend-row { display:flex; align-items:center; gap:16px; padding:9px 22px 12px; flex-wrap:wrap; border-bottom:1px solid var(--border); background:var(--surface2); }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:.82rem; color:var(--text); font-weight:600; }
+  .legend-dot { width:10px; height:10px; border-radius:3px; }
+
+  /* Plan panel */
+  .plan-panel { margin-bottom:18px; }
+  .plan-groups { display:flex; gap:28px; flex-wrap:wrap; margin-bottom:16px; }
+  .plan-group { flex:1; min-width:260px; }
+  .plan-group-title {
+    font-size:.82rem; font-weight:700; color:var(--text); margin-bottom:10px;
+    padding-bottom:6px; border-bottom:2px solid var(--border); display:flex; align-items:center; gap:8px;
+  }
+  .plan-group-title .dot { width:8px; height:8px; border-radius:50%; }
+  .plan-fields { display:flex; flex-direction:column; gap:8px; }
+  .plan-field {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+  }
+  .plan-field label { font-size:.85rem; color:var(--text); font-weight:500; }
+  .plan-field .plan-input-wrap { display:flex; align-items:center; gap:6px; }
+  .plan-field input {
+    width:80px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:.92rem;
+    padding:5px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text);
+  }
+  .plan-field input:focus { outline:none; border-color:var(--accent); box-shadow:var(--glow); }
+  .plan-field .unit { font-size:.78rem; color:var(--text-muted); }
+  .plan-actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .plan-apply-btn {
+    padding:9px 24px; border-radius:8px; font-size:.85rem; font-weight:700; cursor:pointer;
+    border:1px solid transparent; color:#fff;
+    background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);
+    box-shadow:0 2px 10px rgba(37,99,235,.28); transition:opacity .2s;
+  }
+  .plan-apply-btn:hover { opacity:.9; }
+  .plan-total { font-size:.85rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+  /* 드래그앤드롭 업로드 오버레이 */
+  .drop-overlay {
+    display:none; position:fixed; inset:0; z-index:500;
+    align-items:center; justify-content:center;
+    background:rgba(37,99,235,.10); backdrop-filter:blur(2px);
+    border:4px dashed var(--accent); pointer-events:none;
+  }
+  .drop-overlay.active { display:flex; }
+  .drop-overlay-inner {
+    background:#fff; padding:26px 42px; border-radius:16px;
+    font-size:1.15rem; font-weight:700; color:var(--accent);
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:12px;
+  }
+  #empty-state.drag-hover .empty-icon { border-color:var(--accent); box-shadow:var(--glow); }
+  #empty-state.drag-hover p { color:var(--accent); }
+
+  .chart-dl-btn.combo-btn:hover {
+    color:#7c3aed; border-color:#7c3aed; background:rgba(124,58,237,.06);
+  }
+
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  @media (max-width:900px) {
+    .charts-grid { grid-template-columns:1fr; }
+    .chart-card.full { grid-column:auto; }
+    #stat-bar { padding:14px 16px 0; }
+    .stat-card { padding:12px clamp(8px,2vw,20px); }
+    #dashboard { padding:16px 16px 40px; }
+    header { padding:0 16px; }
+    header h1 { display:none; }
+    .plan-groups { flex-direction:column; gap:16px; }
+    .mobile-scroll-hint { display:flex; }
+  }
+  @media (max-width:520px) {
+    #stat-bar { padding:10px 10px 0; }
+    .stat-card { padding:10px 8px; }
+    #dashboard { padding:12px 12px 32px; }
+    .chip span { display:none; }
+    .chart-dl-btn span { display:none; }
+  }
+</style></head><body><header><div class="header-left"><div class="header-icon">🚔</div><h1>2026년 표창 발급 실적 대시보드</h1><span class="beta-tag">BETA</span></div></header><div id="stat-bar" style="display:flex;flex-direction:row;justify-content:center;align-items:stretch;padding:20px 32px 0;"><div class="stat-card" style="border-radius:14px 0 0 14px;"><div class="lbl">전체 인원</div><div class="val-row"><span class="val">285</span><span class="sub">명</span></div></div><div class="stat-card" style="border-left:none;border-radius:0;"><div class="lbl">소속 기관 수</div><div class="val-row"><span class="val">27</span><span class="sub">개 기관</span></div></div><div class="stat-card" style="border-left:none;border-radius:0;"><div class="lbl">계급 종류</div><div class="val-row"><span class="val">16</span><span class="sub">개 계급</span></div></div><div class="stat-card" style="border-left:none;border-radius:0 14px 14px 0;"><div class="lbl">표창 유형 수</div><div class="val-row"><span class="val">6</span><span class="sub">개 항목</span></div></div></div><div id="dashboard" style="display: block;">
+
+  <!-- 표창장 계획 설정 패널 -->
+  <div class="chart-card plan-panel" id="planPanel">
+    <div class="chart-header">
+      <span class="indicator" style="background:#0891b2;box-shadow:0 0 6px #0891b266"></span>
+      <h2>표창장 계획 설정</h2>
+      <span class="chart-tag" style="margin-left:auto;">TARGET PLAN</span>
+    </div>
+    <div class="chart-body">
+      <div class="plan-groups">
+        <div class="plan-group">
+          <div class="plan-group-title"><span class="dot" style="background:#2563eb"></span>정기표창</div>
+          <div class="plan-fields" id="planFieldsRegular"><div class="plan-field"><label for="target-input-정기표창">정기표창 (업무유공/경찰의날/연말)</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-정기표창" value="170"><span class="unit">건</span></div></div></div>
+        </div>
+        <div class="plan-group">
+          <div class="plan-group-title"><span class="dot" style="background:#ea580c"></span>수시표창</div>
+          <div class="plan-fields" id="planFieldsAdhoc"><div class="plan-field"><label for="target-input-총괄과">총괄과</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-총괄과" value="100"><span class="unit">건</span></div></div><div class="plan-field"><label for="target-input-정책과">정책과</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-정책과" value="90"><span class="unit">건</span></div></div><div class="plan-field"><label for="target-input-범예과">범예과</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-범예과" value="160"><span class="unit">건</span></div></div><div class="plan-field"><label for="target-input-여청과">여청과</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-여청과" value="60"><span class="unit">건</span></div></div><div class="plan-field"><label for="target-input-교통과">교통과</label><div class="plan-input-wrap"><input type="number" min="0" id="target-input-교통과" value="70"><span class="unit">건</span></div></div></div>
+        </div>
+      </div>
+      <div class="plan-actions">
+        <button class="plan-apply-btn" onclick="applyTargets()">✓ 적용</button>
+        <span class="plan-total" id="planTotalLabel">총 목표: 650건</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">실적 현황 차트 및 데이터 표</div>
+  <div class="charts-grid">
+
+    <!-- Chart 1: 소속별 월간 누적 실적 레이스 -->
+    <div class="chart-card full">
+      <div class="chart-header">
+        <span class="indicator" style="background:#2563eb;box-shadow:0 0 6px #2563eb66"></span>
+        <h2>소속별 월간 누적 실적 레이스</h2>
+        <span class="chart-tag">VERTICAL BAR RACE</span>
+        <div class="chart-header-actions">
+          <button class="chart-dl-btn excel-btn" onclick="downloadTableExcel('table1Wrap', '소속별_월간_누적_실적_표')">📊 <span>표 엑셀 다운로드</span></button>
+          <button class="chart-dl-btn" onclick="downloadChartImage('chart1', '소속별_월간_누적_실적_레이스')">📷 <span>차트 이미지</span></button>
+          <button class="chart-dl-btn combo-btn" onclick="downloadCombinedImage(this.closest('.chart-card'), '소속별_월간_누적_실적_표+차트')">🖼️ <span>표+차트 저장</span></button>
+        </div>
+      </div>
+      <div class="race-controls">
+        <button class="race-btn" id="racePlay" onclick="raceToggle()">▶ 재생</button>
+        <button class="race-btn" onclick="raceRestart()">⟳ 처음부터</button>
+        <span class="race-month-label" id="raceMonthLabel">8월</span>
+        <span class="race-speed-label">속도</span>
+        <select class="race-speed-select" id="raceSpeed" onchange="raceChangeSpeed()">
+          <option value="1800">느리게</option>
+          <option value="1100" selected="">보통</option>
+          <option value="600">빠르게</option>
+          <option value="300">매우 빠르게</option>
+        </select>
+      </div>
+      <div class="chart-body">
+        <div class="chart-scroll-x">
+          <div id="chart1" class="chart-div race" _echarts_instance_="ec_1788325904572" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 1950px; min-width: 1950px;"><div style="position: relative; width: 1950px; height: 380px; padding: 0px; margin: 0px; border-width: 0px; cursor: default;"><canvas data-zr-dom-id="zr_0" width="1950" height="380" style="position: absolute; left: 0px; top: 0px; width: 1950px; height: 380px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div></div>
+        </div>
+        <div class="mobile-scroll-hint">↔ 옆으로 스크롤하면 전체 소속을 볼 수 있어요</div>
+        <div class="chart-table-wrap" id="table1Wrap"><table class="chart-data-table"><thead><tr><th>순위</th><th>소속 기관</th><th>누적 발급 건수</th></tr></thead><tbody><tr><td class="num-col">1</td><td>경상남도경찰청</td><td class="num-col">43건</td></tr><tr><td class="num-col">2</td><td>진주경찰서</td><td class="num-col">22건</td></tr><tr><td class="num-col">3</td><td>진해경찰서</td><td class="num-col">20건</td></tr><tr><td class="num-col">4</td><td>창원중부경찰서</td><td class="num-col">17건</td></tr><tr><td class="num-col">5</td><td>통영경찰서</td><td class="num-col">16건</td></tr><tr><td class="num-col">6</td><td>양산경찰서</td><td class="num-col">14건</td></tr><tr><td class="num-col">7</td><td>김해중부경찰서</td><td class="num-col">13건</td></tr><tr><td class="num-col">8</td><td>마산중부경찰서</td><td class="num-col">12건</td></tr><tr><td class="num-col">9</td><td>거제경찰서</td><td class="num-col">12건</td></tr><tr><td class="num-col">10</td><td>사천경찰서</td><td class="num-col">12건</td></tr><tr><td class="num-col">11</td><td>창원서부경찰서</td><td class="num-col">9건</td></tr><tr><td class="num-col">12</td><td>밀양경찰서</td><td class="num-col">9건</td></tr><tr><td class="num-col">13</td><td>창녕경찰서</td><td class="num-col">9건</td></tr><tr><td class="num-col">14</td><td>마산동부경찰서</td><td class="num-col">8건</td></tr><tr><td class="num-col">15</td><td>김해서부경찰서</td><td class="num-col">8건</td></tr><tr><td class="num-col">16</td><td>산청경찰서</td><td class="num-col">8건</td></tr><tr><td class="num-col">17</td><td>함안경찰서</td><td class="num-col">8건</td></tr><tr><td class="num-col">18</td><td>합천경찰서</td><td class="num-col">7건</td></tr><tr><td class="num-col">19</td><td>남해경찰서</td><td class="num-col">7건</td></tr><tr><td class="num-col">20</td><td>함양경찰서</td><td class="num-col">7건</td></tr><tr><td class="num-col">21</td><td>고성경찰서</td><td class="num-col">6건</td></tr><tr><td class="num-col">22</td><td>거창경찰서</td><td class="num-col">5건</td></tr><tr><td class="num-col">23</td><td>하동경찰서</td><td class="num-col">5건</td></tr><tr><td class="num-col">24</td><td>의령경찰서</td><td class="num-col">4건</td></tr><tr><td class="num-col">25</td><td>기타</td><td class="num-col">3건</td></tr><tr><td class="num-col">26</td><td>경상남도자치경찰위원회</td><td class="num-col">1건</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Chart 2: 추천기능별 도넛 파이 -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="indicator" style="background:#059669;box-shadow:0 0 6px #05966966"></span>
+        <h2>추천기능별 비율</h2>
+        <span class="chart-tag">DONUT PIE</span>
+        <div class="chart-header-actions">
+          <button class="chart-dl-btn excel-btn" onclick="downloadTableExcel('table2Wrap', '추천기능별_비율_표')">📊 <span>표 엑셀 다운로드</span></button>
+          <button class="chart-dl-btn" onclick="downloadChartImage('chart2', '추천기능별_비율')">📷 <span>차트 이미지</span></button>
+          <button class="chart-dl-btn combo-btn" onclick="downloadCombinedImage(this.closest('.chart-card'), '추천기능별_비율_표+차트')">🖼️ <span>표+차트 저장</span></button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div id="chart2" class="chart-div tall" _echarts_instance_="ec_1788325904573" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative;"><div style="position: relative; width: 517px; height: 320px; padding: 0px; margin: 0px; border-width: 0px;"><canvas data-zr-dom-id="zr_0" width="517" height="320" style="position: absolute; left: 0px; top: 0px; width: 517px; height: 320px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class=""></div></div>
+        <div class="chart-table-wrap" id="table2Wrap"><table class="chart-data-table"><thead><tr><th>구분</th><th>정기표창</th><th>총괄과</th><th>정책과</th><th>범예과</th><th>여청과</th><th>교통과</th><th>합계</th></tr></thead><tbody><tr><td style="font-weight:700;">발급 건수</td><td class="num-col">70건</td><td class="num-col">26건</td><td class="num-col">30건</td><td class="num-col">102건</td><td class="num-col">37건</td><td class="num-col">20건</td><td class="num-col" style="font-weight:700;color:var(--accent);">285건</td></tr><tr><td style="font-weight:700;">비율 (%)</td><td class="num-col">24.6%</td><td class="num-col">9.1%</td><td class="num-col">10.5%</td><td class="num-col">35.8%</td><td class="num-col">13.0%</td><td class="num-col">7.0%</td><td class="num-col" style="font-weight:700;color:var(--accent);">100.0%</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Chart 3: 계급별 분포 -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="indicator" style="background:#d97706;box-shadow:0 0 6px #d9770666"></span>
+        <h2>계급별 분포</h2>
+        <span class="chart-tag">HORIZONTAL BAR</span>
+        <div class="chart-header-actions">
+          <button class="chart-dl-btn excel-btn" onclick="downloadTableExcel('table3Wrap', '계급별_분포_표')">📊 <span>표 엑셀 다운로드</span></button>
+          <button class="chart-dl-btn" onclick="downloadChartImage('chart3', '계급별_분포')">📷 <span>차트 이미지</span></button>
+          <button class="chart-dl-btn combo-btn" onclick="downloadCombinedImage(this.closest('.chart-card'), '계급별_분포_표+차트')">🖼️ <span>표+차트 저장</span></button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div id="chart3" class="chart-div tall" _echarts_instance_="ec_1788325904574" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative;"><div style="position: relative; width: 517px; height: 320px; padding: 0px; margin: 0px; border-width: 0px;"><canvas data-zr-dom-id="zr_0" width="517" height="320" style="position: absolute; left: 0px; top: 0px; width: 517px; height: 320px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class=""></div></div>
+        <div class="chart-table-wrap" id="table3Wrap"><table class="chart-data-table"><thead><tr><th>계급</th><th>발급 건수</th><th>비율</th></tr></thead><tbody><tr><td>경감</td><td class="num-col">44건</td><td class="num-col">15.4%</td></tr><tr><td>경감(승)</td><td class="num-col">3건</td><td class="num-col">1.1%</td></tr><tr><td>경위</td><td class="num-col">49건</td><td class="num-col">17.2%</td></tr><tr><td>경위(승)</td><td class="num-col">2건</td><td class="num-col">0.7%</td></tr><tr><td>경사</td><td class="num-col">75건</td><td class="num-col">26.3%</td></tr><tr><td>경사(승)</td><td class="num-col">10건</td><td class="num-col">3.5%</td></tr><tr><td>경장</td><td class="num-col">54건</td><td class="num-col">18.9%</td></tr><tr><td>경장(승)</td><td class="num-col">9건</td><td class="num-col">3.2%</td></tr><tr><td>순경</td><td class="num-col">32건</td><td class="num-col">11.2%</td></tr><tr><td>기타</td><td class="num-col">7건</td><td class="num-col">2.5%</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Chart 4: 월별 막대차트 -->
+    <div class="chart-card full">
+      <div class="chart-header">
+        <span class="indicator" style="background:#7c3aed;box-shadow:0 0 6px #7c3aed66"></span>
+        <h2>월별 발급 현황</h2>
+        <span class="chart-tag">MONTHLY BAR</span>
+        <div class="chart-header-actions">
+          <button class="chart-dl-btn excel-btn" onclick="downloadTableExcel('table4Wrap', '월별_발급_현황_표')">📊 <span>표 엑셀 다운로드</span></button>
+          <button class="chart-dl-btn" onclick="downloadChartImage('chart4', '월별_발급_현황')">📷 <span>차트 이미지</span></button>
+          <button class="chart-dl-btn combo-btn" onclick="downloadCombinedImage(this.closest('.chart-card'), '월별_발급_현황_표+차트')">🖼️ <span>표+차트 저장</span></button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-scroll-x">
+          <div id="chart4" class="chart-div month" _echarts_instance_="ec_1788325904575" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative; width: 720px; min-width: 720px;"><div style="position: relative; width: 720px; height: 280px; padding: 0px; margin: 0px; border-width: 0px;"><canvas data-zr-dom-id="zr_0" width="720" height="280" style="position: absolute; left: 0px; top: 0px; width: 720px; height: 280px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class=""></div></div>
+        </div>
+        <div class="mobile-scroll-hint">↔ 옆으로 스크롤하면 전체 월을 볼 수 있어요</div>
+        <div class="chart-table-wrap" id="table4Wrap"><table class="chart-data-table"><thead><tr><th>1월</th><th>2월</th><th>3월</th><th>4월</th><th>5월</th><th>6월</th><th>7월</th><th>8월</th><th>9월</th><th>10월</th><th>11월</th><th>12월</th><th>합계</th></tr></thead><tbody><tr><td class="num-col">0건</td><td class="num-col">5건</td><td class="num-col">41건</td><td class="num-col">31건</td><td class="num-col">88건</td><td class="num-col">21건</td><td class="num-col">61건</td><td class="num-col">38건</td><td class="num-col">0건</td><td class="num-col">0건</td><td class="num-col">0건</td><td class="num-col">0건</td><td class="num-col" style="font-weight:700;color:var(--accent);">285건</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Chart 5: 추천기능별 실적 vs 목표 -->
+    <div class="chart-card full">
+      <div class="chart-header">
+        <span class="indicator" style="background:#ea580c;box-shadow:0 0 6px #ea580c66"></span>
+        <h2>추천기능별 실적 vs 목표</h2>
+        <span class="chart-tag">BAR + LINE</span>
+        <div class="chart-header-actions">
+          <button class="chart-dl-btn excel-btn" onclick="downloadTableExcel('table5Wrap', '추천기능별_실적_vs_목표_표')">📊 <span>표 엑셀 다운로드</span></button>
+          <button class="chart-dl-btn" onclick="downloadChartImage('chart5', '추천기능별_실적_vs_목표')">📷 <span>차트 이미지</span></button>
+          <button class="chart-dl-btn combo-btn" onclick="downloadCombinedImage(this.closest('.chart-card'), '추천기능별_실적_vs_목표_표+차트')">🖼️ <span>표+차트 저장</span></button>
+        </div>
+      </div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div>목표(건)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div>실적(건)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>달성률(%)</div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-scroll-x">
+          <div id="chart5" class="chart-div tall" _echarts_instance_="ec_1788325904576" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative; width: 700px; min-width: 700px;"><div style="position: relative; width: 700px; height: 320px; padding: 0px; margin: 0px; border-width: 0px;"><canvas data-zr-dom-id="zr_0" width="700" height="320" style="position: absolute; left: 0px; top: 0px; width: 700px; height: 320px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class=""></div></div>
+        </div>
+        <div class="mobile-scroll-hint">↔ 옆으로 스크롤하면 전체 항목을 볼 수 있어요</div>
+        <div class="chart-table-wrap" id="table5Wrap"><table class="chart-data-table"><thead><tr><th>구분</th><th>정기표창</th><th>총괄과</th><th>정책과</th><th>범예과</th><th>여청과</th><th>교통과</th><th>합계</th></tr></thead><tbody><tr><td style="font-weight:700;">목표 (건)</td><td class="num-col">170건</td><td class="num-col">100건</td><td class="num-col">90건</td><td class="num-col">160건</td><td class="num-col">60건</td><td class="num-col">70건</td><td class="num-col" style="font-weight:700;">650건</td></tr><tr><td style="font-weight:700;">실적 (건)</td><td class="num-col">70건</td><td class="num-col">26건</td><td class="num-col">30건</td><td class="num-col">102건</td><td class="num-col">37건</td><td class="num-col">20건</td><td class="num-col" style="font-weight:700;color:var(--accent);">285건</td></tr><tr><td style="font-weight:700;">달성률 (%)</td><td class="num-col" style="color:#ea580c;">41%</td><td class="num-col" style="color:#ea580c;">26%</td><td class="num-col" style="color:#ea580c;">33%</td><td class="num-col" style="color:#ea580c;">64%</td><td class="num-col" style="color:#ea580c;">62%</td><td class="num-col" style="color:#ea580c;">29%</td><td class="num-col" style="font-weight:700;color:#ea580c;">44%</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+  </div>
+</div><script>var PALETTE=["#2563eb","#059669","#d97706","#7c3aed","#ea580c","#db2777","#0891b2","#65a30d","#dc2626","#0284c7","#7c3aed","#16a34a","#ca8a04","#9333ea","#0d9488","#c2410c"];
+var MONTH_LABELS=["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+var MONTH_KEY_MAP={"10":"10월","11":"11월","12":"12월","01":"1월","02":"2월","03":"3월","04":"4월","05":"5월","06":"6월","07":"7월","08":"8월","09":"9월"};
+var FIXED_ORGS=["경상남도경찰청","창원중부경찰서","창원서부경찰서","마산중부경찰서","마산동부경찰서","진주경찰서","김해중부경찰서","김해서부경찰서","양산경찰서","거제경찰서","진해경찰서","통영경찰서","사천경찰서","밀양경찰서","거창경찰서","합천경찰서","창녕경찰서","고성경찰서","하동경찰서","남해경찰서","함양경찰서","산청경찰서","함안경찰서","의령경찰서","경상남도자치경찰위원회","기타"];
+var FIXED_RANKS=["경감","경감(승)","경위","경위(승)","경사","경사(승)","경장","경장(승)","순경","기타"];
+var TARGET_STATE=[{"key":"정기표창","short":"정기표창","label":"정기표창 (업무유공/경찰의날/연말)","group":"정기","target":170},{"key":"총괄과","short":"총괄과","label":"총괄과","group":"수시","target":100},{"key":"정책과","short":"정책과","label":"정책과","group":"수시","target":90},{"key":"범예과","short":"범예과","label":"범예과","group":"수시","target":160},{"key":"여청과","short":"여청과","label":"여청과","group":"수시","target":60},{"key":"교통과","short":"교통과","label":"교통과","group":"수시","target":70}];
+var AGG={"aggRace":[{"month":"2월","data":[{"name":"경상남도경찰청","value":1,"color":"#2563eb"},{"name":"창원중부경찰서","value":0,"color":"#059669"},{"name":"창원서부경찰서","value":0,"color":"#d97706"},{"name":"마산중부경찰서","value":0,"color":"#7c3aed"},{"name":"마산동부경찰서","value":0,"color":"#ea580c"},{"name":"진주경찰서","value":1,"color":"#db2777"},{"name":"김해중부경찰서","value":0,"color":"#0891b2"},{"name":"김해서부경찰서","value":0,"color":"#65a30d"},{"name":"양산경찰서","value":0,"color":"#dc2626"},{"name":"거제경찰서","value":0,"color":"#0284c7"},{"name":"진해경찰서","value":0,"color":"#7c3aed"},{"name":"통영경찰서","value":0,"color":"#16a34a"},{"name":"사천경찰서","value":0,"color":"#ca8a04"},{"name":"밀양경찰서","value":1,"color":"#9333ea"},{"name":"거창경찰서","value":0,"color":"#0d9488"},{"name":"합천경찰서","value":0,"color":"#c2410c"},{"name":"창녕경찰서","value":0,"color":"#2563eb"},{"name":"고성경찰서","value":0,"color":"#059669"},{"name":"하동경찰서","value":0,"color":"#d97706"},{"name":"남해경찰서","value":0,"color":"#7c3aed"},{"name":"함양경찰서","value":0,"color":"#ea580c"},{"name":"산청경찰서","value":0,"color":"#db2777"},{"name":"함안경찰서","value":0,"color":"#0891b2"},{"name":"의령경찰서","value":0,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":0,"color":"#dc2626"},{"name":"기타","value":2,"color":"#0284c7"}]},{"month":"3월","data":[{"name":"경상남도경찰청","value":9,"color":"#2563eb"},{"name":"창원중부경찰서","value":2,"color":"#059669"},{"name":"창원서부경찰서","value":1,"color":"#d97706"},{"name":"마산중부경찰서","value":4,"color":"#7c3aed"},{"name":"마산동부경찰서","value":1,"color":"#ea580c"},{"name":"진주경찰서","value":5,"color":"#db2777"},{"name":"김해중부경찰서","value":0,"color":"#0891b2"},{"name":"김해서부경찰서","value":1,"color":"#65a30d"},{"name":"양산경찰서","value":1,"color":"#dc2626"},{"name":"거제경찰서","value":2,"color":"#0284c7"},{"name":"진해경찰서","value":3,"color":"#7c3aed"},{"name":"통영경찰서","value":1,"color":"#16a34a"},{"name":"사천경찰서","value":3,"color":"#ca8a04"},{"name":"밀양경찰서","value":2,"color":"#9333ea"},{"name":"거창경찰서","value":0,"color":"#0d9488"},{"name":"합천경찰서","value":2,"color":"#c2410c"},{"name":"창녕경찰서","value":4,"color":"#2563eb"},{"name":"고성경찰서","value":1,"color":"#059669"},{"name":"하동경찰서","value":0,"color":"#d97706"},{"name":"남해경찰서","value":0,"color":"#7c3aed"},{"name":"함양경찰서","value":1,"color":"#ea580c"},{"name":"산청경찰서","value":0,"color":"#db2777"},{"name":"함안경찰서","value":0,"color":"#0891b2"},{"name":"의령경찰서","value":1,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":0,"color":"#dc2626"},{"name":"기타","value":2,"color":"#0284c7"}]},{"month":"4월","data":[{"name":"경상남도경찰청","value":13,"color":"#2563eb"},{"name":"창원중부경찰서","value":3,"color":"#059669"},{"name":"창원서부경찰서","value":3,"color":"#d97706"},{"name":"마산중부경찰서","value":5,"color":"#7c3aed"},{"name":"마산동부경찰서","value":1,"color":"#ea580c"},{"name":"진주경찰서","value":10,"color":"#db2777"},{"name":"김해중부경찰서","value":3,"color":"#0891b2"},{"name":"김해서부경찰서","value":1,"color":"#65a30d"},{"name":"양산경찰서","value":3,"color":"#dc2626"},{"name":"거제경찰서","value":3,"color":"#0284c7"},{"name":"진해경찰서","value":4,"color":"#7c3aed"},{"name":"통영경찰서","value":3,"color":"#16a34a"},{"name":"사천경찰서","value":3,"color":"#ca8a04"},{"name":"밀양경찰서","value":3,"color":"#9333ea"},{"name":"거창경찰서","value":1,"color":"#0d9488"},{"name":"합천경찰서","value":3,"color":"#c2410c"},{"name":"창녕경찰서","value":4,"color":"#2563eb"},{"name":"고성경찰서","value":2,"color":"#059669"},{"name":"하동경찰서","value":0,"color":"#d97706"},{"name":"남해경찰서","value":0,"color":"#7c3aed"},{"name":"함양경찰서","value":2,"color":"#ea580c"},{"name":"산청경찰서","value":2,"color":"#db2777"},{"name":"함안경찰서","value":0,"color":"#0891b2"},{"name":"의령경찰서","value":1,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":1,"color":"#dc2626"},{"name":"기타","value":3,"color":"#0284c7"}]},{"month":"5월","data":[{"name":"경상남도경찰청","value":33,"color":"#2563eb"},{"name":"창원중부경찰서","value":6,"color":"#059669"},{"name":"창원서부경찰서","value":6,"color":"#d97706"},{"name":"마산중부경찰서","value":8,"color":"#7c3aed"},{"name":"마산동부경찰서","value":5,"color":"#ea580c"},{"name":"진주경찰서","value":14,"color":"#db2777"},{"name":"김해중부경찰서","value":6,"color":"#0891b2"},{"name":"김해서부경찰서","value":4,"color":"#65a30d"},{"name":"양산경찰서","value":7,"color":"#dc2626"},{"name":"거제경찰서","value":7,"color":"#0284c7"},{"name":"진해경찰서","value":10,"color":"#7c3aed"},{"name":"통영경찰서","value":5,"color":"#16a34a"},{"name":"사천경찰서","value":6,"color":"#ca8a04"},{"name":"밀양경찰서","value":5,"color":"#9333ea"},{"name":"거창경찰서","value":4,"color":"#0d9488"},{"name":"합천경찰서","value":5,"color":"#c2410c"},{"name":"창녕경찰서","value":6,"color":"#2563eb"},{"name":"고성경찰서","value":4,"color":"#059669"},{"name":"하동경찰서","value":2,"color":"#d97706"},{"name":"남해경찰서","value":2,"color":"#7c3aed"},{"name":"함양경찰서","value":4,"color":"#ea580c"},{"name":"산청경찰서","value":4,"color":"#db2777"},{"name":"함안경찰서","value":5,"color":"#0891b2"},{"name":"의령경찰서","value":3,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":1,"color":"#dc2626"},{"name":"기타","value":3,"color":"#0284c7"}]},{"month":"6월","data":[{"name":"경상남도경찰청","value":34,"color":"#2563eb"},{"name":"창원중부경찰서","value":9,"color":"#059669"},{"name":"창원서부경찰서","value":6,"color":"#d97706"},{"name":"마산중부경찰서","value":9,"color":"#7c3aed"},{"name":"마산동부경찰서","value":5,"color":"#ea580c"},{"name":"진주경찰서","value":16,"color":"#db2777"},{"name":"김해중부경찰서","value":6,"color":"#0891b2"},{"name":"김해서부경찰서","value":4,"color":"#65a30d"},{"name":"양산경찰서","value":11,"color":"#dc2626"},{"name":"거제경찰서","value":8,"color":"#0284c7"},{"name":"진해경찰서","value":13,"color":"#7c3aed"},{"name":"통영경찰서","value":6,"color":"#16a34a"},{"name":"사천경찰서","value":6,"color":"#ca8a04"},{"name":"밀양경찰서","value":5,"color":"#9333ea"},{"name":"거창경찰서","value":5,"color":"#0d9488"},{"name":"합천경찰서","value":5,"color":"#c2410c"},{"name":"창녕경찰서","value":6,"color":"#2563eb"},{"name":"고성경찰서","value":4,"color":"#059669"},{"name":"하동경찰서","value":3,"color":"#d97706"},{"name":"남해경찰서","value":3,"color":"#7c3aed"},{"name":"함양경찰서","value":4,"color":"#ea580c"},{"name":"산청경찰서","value":5,"color":"#db2777"},{"name":"함안경찰서","value":5,"color":"#0891b2"},{"name":"의령경찰서","value":4,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":1,"color":"#dc2626"},{"name":"기타","value":3,"color":"#0284c7"}]},{"month":"7월","data":[{"name":"경상남도경찰청","value":40,"color":"#2563eb"},{"name":"창원중부경찰서","value":13,"color":"#059669"},{"name":"창원서부경찰서","value":9,"color":"#d97706"},{"name":"마산중부경찰서","value":10,"color":"#7c3aed"},{"name":"마산동부경찰서","value":7,"color":"#ea580c"},{"name":"진주경찰서","value":19,"color":"#db2777"},{"name":"김해중부경찰서","value":10,"color":"#0891b2"},{"name":"김해서부경찰서","value":8,"color":"#65a30d"},{"name":"양산경찰서","value":12,"color":"#dc2626"},{"name":"거제경찰서","value":12,"color":"#0284c7"},{"name":"진해경찰서","value":17,"color":"#7c3aed"},{"name":"통영경찰서","value":14,"color":"#16a34a"},{"name":"사천경찰서","value":10,"color":"#ca8a04"},{"name":"밀양경찰서","value":8,"color":"#9333ea"},{"name":"거창경찰서","value":5,"color":"#0d9488"},{"name":"합천경찰서","value":6,"color":"#c2410c"},{"name":"창녕경찰서","value":8,"color":"#2563eb"},{"name":"고성경찰서","value":5,"color":"#059669"},{"name":"하동경찰서","value":4,"color":"#d97706"},{"name":"남해경찰서","value":4,"color":"#7c3aed"},{"name":"함양경찰서","value":5,"color":"#ea580c"},{"name":"산청경찰서","value":6,"color":"#db2777"},{"name":"함안경찰서","value":7,"color":"#0891b2"},{"name":"의령경찰서","value":4,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":1,"color":"#dc2626"},{"name":"기타","value":3,"color":"#0284c7"}]},{"month":"8월","data":[{"name":"경상남도경찰청","value":43,"color":"#2563eb"},{"name":"창원중부경찰서","value":17,"color":"#059669"},{"name":"창원서부경찰서","value":9,"color":"#d97706"},{"name":"마산중부경찰서","value":12,"color":"#7c3aed"},{"name":"마산동부경찰서","value":8,"color":"#ea580c"},{"name":"진주경찰서","value":22,"color":"#db2777"},{"name":"김해중부경찰서","value":13,"color":"#0891b2"},{"name":"김해서부경찰서","value":8,"color":"#65a30d"},{"name":"양산경찰서","value":14,"color":"#dc2626"},{"name":"거제경찰서","value":12,"color":"#0284c7"},{"name":"진해경찰서","value":20,"color":"#7c3aed"},{"name":"통영경찰서","value":16,"color":"#16a34a"},{"name":"사천경찰서","value":12,"color":"#ca8a04"},{"name":"밀양경찰서","value":9,"color":"#9333ea"},{"name":"거창경찰서","value":5,"color":"#0d9488"},{"name":"합천경찰서","value":7,"color":"#c2410c"},{"name":"창녕경찰서","value":9,"color":"#2563eb"},{"name":"고성경찰서","value":6,"color":"#059669"},{"name":"하동경찰서","value":5,"color":"#d97706"},{"name":"남해경찰서","value":7,"color":"#7c3aed"},{"name":"함양경찰서","value":7,"color":"#ea580c"},{"name":"산청경찰서","value":8,"color":"#db2777"},{"name":"함안경찰서","value":8,"color":"#0891b2"},{"name":"의령경찰서","value":4,"color":"#65a30d"},{"name":"경상남도자치경찰위원회","value":1,"color":"#dc2626"},{"name":"기타","value":3,"color":"#0284c7"}]}],"aggFunc":[{"name":"범예과","value":102},{"name":"정기표창","value":70},{"name":"여청과","value":37},{"name":"정책과","value":30},{"name":"총괄과","value":26},{"name":"교통과","value":20}],"aggRank":[{"name":"경감","value":44},{"name":"경감(승)","value":3},{"name":"경위","value":49},{"name":"경위(승)","value":2},{"name":"경사","value":75},{"name":"경사(승)","value":10},{"name":"경장","value":54},{"name":"경장(승)","value":9},{"name":"순경","value":32},{"name":"기타","value":7}],"aggMonth":[0,5,41,31,88,21,61,38,0,0,0,0],"aggTarget":[{"category":"정기표창","key":"정기표창","group":"정기","actual":70,"target":170,"rate":41},{"category":"총괄과","key":"총괄과","group":"수시","actual":26,"target":100,"rate":26},{"category":"정책과","key":"정책과","group":"수시","actual":30,"target":90,"rate":33},{"category":"범예과","key":"범예과","group":"수시","actual":102,"target":160,"rate":64},{"category":"여청과","key":"여청과","group":"수시","actual":37,"target":60,"rate":62},{"category":"교통과","key":"교통과","group":"수시","actual":20,"target":70,"rate":29}],"funcCounts":{"총괄과":26,"여청과":37,"범예과":102,"정책과":30,"정기표창":70,"교통과":20}};
+var currentFuncCounts=AGG.funcCounts||{};
+var chartMap={};var raceFrames=[];var raceIndex=0;var raceTimer=null;var raceInterval=1100;
+var CHART_CAT_COUNTS={};var CHART_WIDTH_CFG={chart1:75,chart4:60,chart5:95};var CHART_WIDTH_MIN={chart1:700,chart4:600,chart5:700};
+function mkChart(id){if(chartMap[id]){try{chartMap[id].dispose();}catch(e){}}var c=echarts.init(document.getElementById(id),null,{renderer:"canvas"});chartMap[id]=c;return c;}
+function applyMobileChartWidth(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var wrap = el.parentElement;
+  var n = CHART_CAT_COUNTS[id];
+  if (!n || !wrap) { el.style.width=''; el.style.minWidth=''; return; }
+
+  // 먼저 강제 폭을 초기화해야 래퍼의 "실제 가용 폭"을 정확히 측정할 수 있음
+  el.style.width='';
+  el.style.minWidth='';
+
+  var perItem = CHART_WIDTH_CFG[id] || 70;
+  var minW    = CHART_WIDTH_MIN[id] || 600;
+  var ideal   = Math.max(minW, n * perItem);
+  var avail   = wrap.clientWidth || document.documentElement.clientWidth || window.innerWidth || 9999;
+
+  if (ideal > avail) {
+    el.style.width    = ideal + 'px';
+    el.style.minWidth = ideal + 'px';
+  }
+}
+function applyAllMobileChartWidths() {
+  Object.keys(CHART_CAT_COUNTS).forEach(function(id){ applyMobileChartWidth(id); });
+  Object.keys(chartMap).forEach(function(id){
+    try { chartMap[id].resize(); } catch(e) {}
+  });
+}
+function downloadChartImage(chartId, fileName) {
+  var chart = chartMap[chartId];
+  if (!chart) {
+    alert('차트가 아직 로드되지 않았습니다.');
+    return;
+  }
+  var url = chart.getDataURL({
+    type: 'png',
+    pixelRatio: 2,
+    backgroundColor: '#ffffff',
+    excludeComponents: ['toolbox']
+  });
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (fileName || chartId) + '_' + new Date().toISOString().slice(0, 10) + '.png';
+  a.click();
+}
+function downloadTableExcel(wrapId, fileName) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var table = wrap.querySelector('table');
+  if (!table) {
+    alert('다운로드할 표 데이터가 없습니다.');
+    return;
+  }
+  var wb = XLSX.utils.table_to_book(table, { sheet: "표데이터" });
+  XLSX.writeFile(wb, (fileName || '표_데이터') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+function downloadCombinedImage(cardEl, fileName) {
+  var card = typeof cardEl === 'string' ? document.getElementById(cardEl) : cardEl;
+  if (!card) { alert('저장할 영역을 찾을 수 없습니다.'); return; }
+  if (typeof html2canvas === 'undefined') {
+    alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인 후 다시 시도해주세요.');
+    return;
+  }
+  var actionEls = card.querySelectorAll('.chart-header-actions');
+  actionEls.forEach(function(el){ el.style.visibility = 'hidden'; });
+
+  html2canvas(card, { backgroundColor: '#ffffff', scale: 2, useCORS: true }).then(function(canvas) {
+    actionEls.forEach(function(el){ el.style.visibility = ''; });
+    var a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = (fileName || '차트_표') + '_' + new Date().toISOString().slice(0, 10) + '.png';
+    a.click();
+  }).catch(function(err) {
+    actionEls.forEach(function(el){ el.style.visibility = ''; });
+    alert('이미지 생성 중 오류가 발생했습니다: ' + err.message);
+  });
+}
+function buildTargetAgg(funcCounts) {
+  return TARGET_STATE.map(function(t){
+    var actual = funcCounts[t.key] || 0;
+    var rate = t.target > 0 ? Math.round(actual / t.target * 100) : 0;
+    return { category:t.short, key:t.key, group:t.group, actual:actual, target:t.target, rate:rate };
+  });
+}
+function renderPlanFields() {
+  var regWrap = document.getElementById('planFieldsRegular');
+  var adhWrap = document.getElementById('planFieldsAdhoc');
+  if (!regWrap || !adhWrap) return;
+  regWrap.innerHTML = ''; adhWrap.innerHTML = '';
+  TARGET_STATE.forEach(function(t){
+    var wrap = t.group === '정기' ? regWrap : adhWrap;
+    var div = document.createElement('div');
+    div.className = 'plan-field';
+    div.innerHTML =
+      '<label for="target-input-' + t.key + '">' + t.label + '</label>' +
+      '<div class="plan-input-wrap">' +
+        '<input type="number" min="0" id="target-input-' + t.key + '" value="' + t.target + '">' +
+        '<span class="unit">건</span>' +
+      '</div>';
+    wrap.appendChild(div);
+  });
+  updatePlanTotal();
+}
+function updatePlanTotal() {
+  var el = document.getElementById('planTotalLabel');
+  if (!el) return;
+  var sum = TARGET_STATE.reduce(function(s,t){ return s + t.target; }, 0);
+  el.textContent = '총 목표: ' + sum + '건';
+}
+function applyTargets() {
+  TARGET_STATE.forEach(function(t){
+    var el = document.getElementById('target-input-' + t.key);
+    if (!el) return;
+    var v = parseInt(el.value, 10);
+    t.target = (isNaN(v) || v < 0) ? 0 : v;
+  });
+  updatePlanTotal();
+  if (currentFuncCounts && Object.keys(currentFuncCounts).length) {
+    var aggTarget = buildTargetAgg(currentFuncCounts);
+    drawChart5(aggTarget);
+    renderTable5(aggTarget);
+    if (window.__lastAgg) window.__lastAgg.aggTarget = aggTarget;
+  }
+}
+function renderTable1(frames) {
+  var wrap = document.getElementById('table1Wrap');
+  if (!wrap || !frames || !frames.length) return;
+  var lastFrame = frames[frames.length - 1].data;
+  var sorted = lastFrame.slice().sort(function(a,b){ return b.value - a.value; });
+  
+  var html = '<table class="chart-data-table"><thead><tr><th>순위</th><th>소속 기관</th><th>누적 발급 건수</th></tr></thead><tbody>';
+  sorted.forEach(function(item, idx) {
+    html += '<tr>' +
+      '<td class="num-col">' + (idx + 1) + '</td>' +
+      '<td>' + item.name + '</td>' +
+      '<td class="num-col">' + item.value + '건</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+function renderTable2(data) {
+  var wrap = document.getElementById('table2Wrap');
+  if (!wrap || !data) return;
+
+  var order = ['정기표창', '총괄과', '정책과', '범예과', '여청과', '교통과'];
+  var dataMap = {};
+  data.forEach(function(d){ dataMap[d.name] = d.value; });
+
+  var orderedData = order.map(function(name){
+    return { name: name, value: dataMap[name] || 0 };
+  });
+
+  data.forEach(function(d){
+    if (order.indexOf(d.name) === -1) {
+      orderedData.push({ name: d.name, value: d.value });
+    }
+  });
+
+  var total = data.reduce(function(s, d){ return s + d.value; }, 0);
+  
+  var html = '<table class="chart-data-table"><thead><tr><th>구분</th>';
+  orderedData.forEach(function(item) {
+    html += '<th>' + item.name + '</th>';
+  });
+  html += '<th>합계</th></tr></thead><tbody>';
+
+  html += '<tr><td style="font-weight:700;">발급 건수</td>';
+  orderedData.forEach(function(item) {
+    html += '<td class="num-col">' + item.value + '건</td>';
+  });
+  html += '<td class="num-col" style="font-weight:700;color:var(--accent);">' + total + '건</td></tr>';
+
+  html += '<tr><td style="font-weight:700;">비율 (%)</td>';
+  orderedData.forEach(function(item) {
+    var ratio = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0';
+    html += '<td class="num-col">' + ratio + '%</td>';
+  });
+  html += '<td class="num-col" style="font-weight:700;color:var(--accent);">100.0%</td></tr>';
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+function renderTable3(data) {
+  var wrap = document.getElementById('table3Wrap');
+  if (!wrap || !data) return;
+  var total = data.reduce(function(s, d){ return s + d.value; }, 0);
+  
+  var html = '<table class="chart-data-table"><thead><tr><th>계급</th><th>발급 건수</th><th>비율</th></tr></thead><tbody>';
+  data.forEach(function(item) {
+    var ratio = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0';
+    html += '<tr>' +
+      '<td>' + item.name + '</td>' +
+      '<td class="num-col">' + item.value + '건</td>' +
+      '<td class="num-col">' + ratio + '%</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+function renderTable4(monthValues) {
+  var wrap = document.getElementById('table4Wrap');
+  if (!wrap || !monthValues) return;
+  var total = monthValues.reduce(function(s, v){ return s + v; }, 0);
+  
+  var html = '<table class="chart-data-table"><thead><tr>';
+  MONTH_LABELS.forEach(function(m){ html += '<th>' + m + '</th>'; });
+  html += '<th>합계</th></tr></thead><tbody><tr>';
+  monthValues.forEach(function(v){ html += '<td class="num-col">' + v + '건</td>'; });
+  html += '<td class="num-col" style="font-weight:700;color:var(--accent);">' + total + '건</td></tr></tbody></table>';
+  wrap.innerHTML = html;
+}
+function renderTable5(data) {
+  var wrap = document.getElementById('table5Wrap');
+  if (!wrap || !data) return;
+  
+  var totalTarget = data.reduce(function(s, item){ return s + item.target; }, 0);
+  var totalActual = data.reduce(function(s, item){ return s + item.actual; }, 0);
+  var totalRate = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+
+  var html = '<table class="chart-data-table"><thead><tr><th>구분</th>';
+  data.forEach(function(item) {
+    html += '<th>' + item.category + '</th>';
+  });
+  html += '<th>합계</th></tr></thead><tbody>';
+
+  // 1행: 목표
+  html += '<tr><td style="font-weight:700;">목표 (건)</td>';
+  data.forEach(function(item) {
+    html += '<td class="num-col">' + item.target + '건</td>';
+  });
+  html += '<td class="num-col" style="font-weight:700;">' + totalTarget + '건</td></tr>';
+
+  // 2행: 실적
+  html += '<tr><td style="font-weight:700;">실적 (건)</td>';
+  data.forEach(function(item) {
+    html += '<td class="num-col">' + item.actual + '건</td>';
+  });
+  html += '<td class="num-col" style="font-weight:700;color:var(--accent);">' + totalActual + '건</td></tr>';
+
+  // 3행: 달성률
+  html += '<tr><td style="font-weight:700;">달성률 (%)</td>';
+  data.forEach(function(item) {
+    html += '<td class="num-col" style="color:' + (item.rate >= 100 ? '#059669' : '#ea580c') + ';">' + item.rate + '%</td>';
+  });
+  html += '<td class="num-col" style="font-weight:700;color:' + (totalRate >= 100 ? '#059669' : '#ea580c') + ';">' + totalRate + '%</td></tr>';
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+function drawChart1(frames) {
+  raceStop();
+  if(!frames||!frames.length)return;
+  raceFrames=frames; raceIndex=0;
+  CHART_CAT_COUNTS['chart1'] = (frames[0].data||[]).length;
+  applyMobileChartWidth('chart1');
+  var c=mkChart('chart1');
+
+  function getOpt(frame){
+    var names =frame.data.map(function(d){return d.name;});
+    var values=frame.data.map(function(d){return d.value;});
+    var colors=frame.data.map(function(d){return d.color;});
+    var maxVal=Math.max.apply(null,values)||1;
+    var el=document.getElementById('chart1');
+    var bigFont=Math.min(48,Math.round((el?el.offsetWidth:700)*0.055));
+    return{
+      backgroundColor:'transparent',
+      grid:{left:'3%',right:'3%',top:'16%',bottom:'28%',containLabel:true},
+      xAxis:{type:'category',data:names,
+        axisLabel:{color:'#334155',fontSize:12,fontFamily:'Noto Sans KR',
+          interval:0,rotate:50,width:110,overflow:'truncate'},
+        axisLine:{show:false},axisTick:{show:false},
+        animationDuration:300,animationDurationUpdate:700
+      },
+      yAxis:{
+        type:'value',
+        minInterval: 1, // Y축에 소수점이 표시되지 않도록 정수 단위 눈금만 생성
+        max:Math.ceil(maxVal*1.2),
+        axisLabel:{color:'#94a3b8',fontSize:12.5,fontFamily:'JetBrains Mono'},
+        splitLine:{lineStyle:{color:'#e2e8f0',type:'dashed'}},axisLine:{show:false}
+      },
+      series:[{
+        realtimeSort:false,type:'bar',
+        data:values.map(function(v,i){return{value:v,itemStyle:{
+          color:new echarts.graphic.LinearGradient(0,0,0,1,[
+            {offset:0,color:colors[i]},{offset:1,color:colors[i]+'44'}
+          ]),borderRadius:[6,6,0,0]
+        }};}),
+        label:{show:true,position:'top',formatter:'{c}건',
+          color:'#475569',fontSize:12.5,fontFamily:'JetBrains Mono',fontWeight:600},
+        barMaxWidth:32
+      }],
+      graphic:[{
+        type:'text',right:'2%',top:'2%',
+        style:{text:frame.month,fill:'rgba(37,99,235,.14)',
+          fontSize:bigFont,fontWeight:900,fontFamily:'JetBrains Mono',textAlign:'right'},
+        z:100
+      }],
+      animationDuration:0,animationDurationUpdate:750,
+      animationEasing:'linear',animationEasingUpdate:'linear'
+    };
+  }
+
+  c.setOption(getOpt(frames[0]));
+  document.getElementById('raceMonthLabel').textContent=frames[0].month;
+  document.getElementById('racePlay').textContent='▶ 재생';
+  document.getElementById('racePlay').classList.remove('active');
+
+  c.__raceStep=function(){
+    if(raceIndex>=raceFrames.length){
+      raceStop();
+      document.getElementById('racePlay').textContent='▶ 재생';
+      document.getElementById('racePlay').classList.remove('active');
+      return;
+    }
+    var frame=raceFrames[raceIndex];
+    c.setOption(getOpt(frame));
+    document.getElementById('raceMonthLabel').textContent=frame.month;
+    raceIndex++;
+  };
+}
+function drawChart2(cd) {
+  if(!cd.length)return;
+  var c=mkChart('chart2');
+  var total=cd.reduce(function(s,d){return s+d.value;},0);
+
+  var pieData=cd.map(function(d,i){
+    return{name:d.name,value:d.value,
+      itemStyle:{color:PALETTE[i%PALETTE.length],borderColor:'#ffffff',borderWidth:2}};
+  });
+
+  c.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'item',
+      backgroundColor:'#1e293b',borderColor:'#334155',
+      textStyle:{color:'#f1f5f9',fontFamily:'Noto Sans KR',fontSize:14},
+      formatter:function(p){return p.name+'<br><b>'+p.value+'건</b> ('+p.percent.toFixed(1)+'%)';}
+    },
+    graphic:[{
+      type:'group',left:'center',top:'center',
+      children:[
+        {type:'text',style:{
+          text:'TOTAL',textAlign:'center',
+          fill:'#94a3b8',fontSize:11,fontWeight:600,fontFamily:'JetBrains Mono',
+          x:0,y:-8
+        }},
+        {type:'text',style:{
+          text:total+'건',textAlign:'center',
+          fill:'#1e293b',fontSize:20,fontWeight:700,fontFamily:'JetBrains Mono',
+          x:0,y:10
+        }}
+      ]
+    }],
+    series:[{
+      type:'pie',
+      radius:['32%','56%'],
+      center:['50%','50%'],
+      data:pieData,
+      label:{
+        show:true,
+        formatter:function(p){return p.name+'\n'+p.value+'건 ('+p.percent.toFixed(1)+'%)';},
+        color:'#334155',fontSize:15.5,fontWeight:700,fontFamily:'Noto Sans KR',
+        lineHeight:19
+      },
+      labelLine:{show:true,length:14,length2:10,lineStyle:{color:'#cbd5e1'}},
+      labelLayout:{hideOverlap:true},
+      emphasis:{
+        itemStyle:{shadowBlur:14,shadowColor:'rgba(0,0,0,.15)'},
+        label:{show:true,fontSize:17,fontWeight:700,color:'#1e293b'}
+      },
+      animationType:'expansion',
+      animationDuration:900
+    }]
+  });
+}
+function drawChart3(cd) {
+  if(!cd.length)return;
+  var c=mkChart('chart3');
+  var names =cd.map(function(d){return d.name;});
+  var values=cd.map(function(d){return d.value;});
+  c.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'},
+      backgroundColor:'#1e293b',borderColor:'#334155',
+      textStyle:{color:'#f1f5f9',fontFamily:'Noto Sans KR',fontSize:14},
+      formatter:function(p){return p[0].name+': <b>'+p[0].value+'건</b>';}
+    },
+    grid:{left:'3%',right:'14%',top:'4%',bottom:'4%',containLabel:true},
+    xAxis:{type:'value',minInterval:1,
+      axisLabel:{color:'#94a3b8',fontSize:12.5,fontFamily:'JetBrains Mono'},
+      splitLine:{lineStyle:{color:'#e2e8f0',type:'dashed'}},axisLine:{show:false}
+    },
+    yAxis:{type:'category',data:names,inverse:true,
+      axisLabel:{color:'#334155',fontSize:13.5,fontFamily:'Noto Sans KR'},
+      axisLine:{show:false},axisTick:{show:false}
+    },
+    series:[{
+      type:'bar',
+      data:values.map(function(v,i){return{value:v,itemStyle:{
+        color:new echarts.graphic.LinearGradient(0,0,1,0,[
+          {offset:0,color:PALETTE[i%PALETTE.length]+'55'},
+          {offset:1,color:PALETTE[i%PALETTE.length]}
+        ]),borderRadius:[0,6,6,0]
+      }};}),
+      label:{show:true,position:'right',formatter:'{c}건',color:'#475569',fontSize:13.5,fontFamily:'JetBrains Mono',fontWeight:600},
+      barMaxWidth:24,
+      emphasis:{itemStyle:{shadowBlur:12,shadowColor:'rgba(217,119,6,.25)'}}
+    }]
+  });
+}
+function drawChart4(monthValues) {
+  CHART_CAT_COUNTS['chart4'] = MONTH_LABELS.length;
+  applyMobileChartWidth('chart4');
+  var c=mkChart('chart4');
+  var barData=monthValues.map(function(v,i){
+    var col=PALETTE[i%PALETTE.length];
+    return{value:v,itemStyle:{
+      color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:col},{offset:1,color:col+'44'}
+      ]),
+      borderRadius:[6,6,0,0],
+      opacity:v>0?1:0.2
+    }};
+  });
+  c.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'},
+      backgroundColor:'#1e293b',borderColor:'#334155',
+      textStyle:{color:'#f1f5f9',fontFamily:'Noto Sans KR',fontSize:14},
+      formatter:function(p){
+        var v=p[0].value;
+        return p[0].name+': '+(v>0?'<b>'+v+'건</b>':'<span style="color:#94a3b8">데이터 없음</span>');
+      }
+    },
+    grid:{left:'3%',right:'4%',top:'14%',bottom:'8%',containLabel:true},
+    xAxis:{type:'category',data:MONTH_LABELS,
+      axisLabel:{color:'#334155',fontSize:14.5,fontFamily:'Noto Sans KR'},
+      axisLine:{lineStyle:{color:'#cbd5e1'}},axisTick:{show:false}
+    },
+    yAxis:{type:'value',minInterval:1,
+      axisLabel:{color:'#94a3b8',fontSize:12.5,fontFamily:'JetBrains Mono'},
+      splitLine:{lineStyle:{color:'#e2e8f0',type:'dashed'}},axisLine:{show:false}
+    },
+    series:[{
+      type:'bar',data:barData,barWidth:'58%',
+      label:{show:true,position:'top',
+        formatter:function(p){return p.value>0?p.value+'건':'';},
+        color:'#475569',fontSize:13.5,fontFamily:'JetBrains Mono',fontWeight:600
+      },
+      emphasis:{itemStyle:{shadowBlur:12,shadowColor:'rgba(124,58,237,.2)'}},
+      markLine:{silent:true,
+        lineStyle:{color:'rgba(217,119,6,.55)',type:'dashed',width:1.5},
+        label:{formatter:'평균 {c}건',color:'#d97706',fontSize:12.5,fontFamily:'JetBrains Mono',position:'end'},
+        data:[{type:'average',name:'평균'}]
+      }
+    }]
+  });
+}
+function drawChart5(cd) {
+  var cats = cd.map(function(d){ return d.category; });
+  CHART_CAT_COUNTS['chart5'] = cats.length;
+  applyMobileChartWidth('chart5');
+  var c = mkChart('chart5');
+  var actuals = cd.map(function(d){ return d.actual; });
+  var targets = cd.map(function(d){ return d.target; });
+  var rates   = cd.map(function(d){ return Math.min(d.rate, 999); });
+
+  var maxCount  = Math.max.apply(null, targets.concat(actuals)) || 1;
+  var maxRate   = Math.max.apply(null, rates) || 100;
+  var rateUpper = Math.max(100, Math.ceil(maxRate * 1.15));
+
+  c.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: '#1e293b',
+      borderColor: '#334155',
+      textStyle: { color: '#f1f5f9', fontFamily: 'Noto Sans KR', fontSize: 14 },
+      formatter: function(p) {
+        var s = p[0].name + '<br>';
+        p.forEach(function(x) {
+          s += x.marker + ' ' + x.seriesName + ': <b>' + x.value + (x.seriesName === '달성률(%)' ? '%' : '건') + '</b><br>';
+        });
+        return s;
+      }
+    },
+    legend: {
+      data: ['목표', '실적', '달성률(%)'],
+      bottom: 4,
+      textStyle: { color: '#475569', fontFamily: 'Noto Sans KR', fontSize: 14.5 },
+      itemWidth: 14,
+      itemHeight: 10
+    },
+    grid: { left: '3%', right: '5%', top: '12%', bottom: '60px', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: cats,
+      axisLabel: { color: '#334155', fontSize: 14.5, fontFamily: 'Noto Sans KR' },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisTick: { show: false }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        minInterval: 1,
+        name: '건수',
+        nameTextStyle: { color: '#94a3b8', fontSize: 12.5 },
+        axisLabel: { color: '#94a3b8', fontSize: 12.5, fontFamily: 'JetBrains Mono' },
+        splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' } },
+        axisLine: { show: false },
+        min: 0,
+        max: Math.ceil(maxCount * 2.15)
+      },
+      {
+        type: 'value',
+        name: '달성률(%)',
+        nameTextStyle: { color: '#94a3b8', fontSize: 12.5 },
+        axisLabel: { color: '#94a3b8', fontSize: 12.5, fontFamily: 'JetBrains Mono', formatter: '{value}%' },
+        splitLine: { show: false },
+        axisLine: { show: false },
+        min: -Math.ceil(rateUpper * 1.1),
+        max: rateUpper
+      }
+    ],
+    series: [
+      {
+        name: '목표',
+        type: 'bar',
+        yAxisIndex: 0,
+        barGap: '20%',
+        itemStyle: { color: '#ea580c' },
+        data: targets.map(function(v) {
+          return {
+            value: v,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#ea580c' },
+                { offset: 1, color: '#ea580c55' }
+              ]),
+              borderRadius: [6, 6, 0, 0]
+            }
+          };
+        }),
+        barWidth: '26%',
+        label: {
+          show: true,
+          position: 'top',
+          formatter: '{c}',
+          color: '#ea580c',
+          fontSize: 13.5,
+          fontFamily: 'JetBrains Mono',
+          fontWeight: 600
+        },
+        emphasis: { itemStyle: { shadowBlur: 14, shadowColor: 'rgba(234,88,12,.25)' } }
+      },
+      {
+        name: '실적',
+        type: 'bar',
+        yAxisIndex: 0,
+        itemStyle: { color: '#2563eb' },
+        data: actuals.map(function(v) {
+          return {
+            value: v,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#2563eb' },
+                { offset: 1, color: '#2563eb55' }
+              ]),
+              borderRadius: [6, 6, 0, 0]
+            }
+          };
+        }),
+        barWidth: '26%',
+        label: {
+          show: true,
+          position: 'inside',
+          formatter: '{c}',
+          color: '#fff',
+          fontSize: 13.5,
+          fontWeight: 700,
+          fontFamily: 'JetBrains Mono'
+        },
+        emphasis: { itemStyle: { shadowBlur: 14, shadowColor: 'rgba(37,99,235,.25)' } }
+      },
+      {
+        name: '달성률(%)',
+        type: 'line',
+        yAxisIndex: 1,
+        data: rates,
+        lineStyle: { width: 3, color: '#059669' },
+        symbol: 'circle',
+        symbolSize: 9,
+        itemStyle: { color: '#059669', borderColor: '#fff', borderWidth: 2 },
+        label: {
+          show: true,
+          position: 'top',
+          distance: 8,
+          color: '#059669',
+          fontSize: 13.5,
+          fontFamily: 'JetBrains Mono',
+          fontWeight: 700,
+          formatter: '{c}%'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(5,150,105,.2)' },
+            { offset: 1, color: 'rgba(5,150,105,0)' }
+          ])
+        },
+        z: 10
+      }
+    ]
+  });
+}
+function raceStop(){if(raceTimer){clearInterval(raceTimer);raceTimer=null;}}
+function raceAutoStart(){
+  if(raceFrames.length&&!raceTimer){
+    var btn=document.getElementById('racePlay');
+    btn.textContent='⏸ 일시정지'; btn.classList.add('active');
+    var c=chartMap['chart1']; if(!c||!c.__raceStep)return;
+    c.__raceStep();
+    raceTimer=setInterval(function(){
+      if(!chartMap['chart1']||!chartMap['chart1'].__raceStep){raceStop();return;}
+      chartMap['chart1'].__raceStep();
+    },raceInterval);
+  }
+}
+function raceToggle(){
+  var btn=document.getElementById('racePlay');
+  if(raceTimer){
+    raceStop();btn.textContent='▶ 재생';btn.classList.remove('active');
+  }else{
+    if(raceIndex>=raceFrames.length)raceIndex=0;
+    btn.textContent='⏸ 일시정지';btn.classList.add('active');
+    var c=chartMap['chart1'];if(!c||!c.__raceStep)return;
+    c.__raceStep();
+    raceTimer=setInterval(function(){
+      if(!chartMap['chart1']||!chartMap['chart1'].__raceStep){raceStop();return;}
+      chartMap['chart1'].__raceStep();
+    },raceInterval);
+  }
+}
+function raceRestart(){
+  raceStop();raceIndex=0;
+  if(!raceFrames.length)return;
+  var c=chartMap['chart1'];if(!c)return;
+  var f=raceFrames[0];
+  c.setOption({
+    yAxis:{
+      minInterval: 1,
+      max:Math.ceil((Math.max.apply(null,f.data.map(function(d){return d.value;}))||1)*1.2)
+    },
+    xAxis:{data:f.data.map(function(d){return d.name;})},
+    series:[{data:f.data.map(function(d){return{value:d.value,itemStyle:{
+      color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:d.color},{offset:1,color:d.color+'44'}
+      ]),borderRadius:[6,6,0,0]
+    }};})}],
+    graphic:[{style:{text:f.month}}]
+  });
+  document.getElementById('raceMonthLabel').textContent=f.month;
+  document.getElementById('racePlay').textContent='▶ 재생';
+  document.getElementById('racePlay').classList.remove('active');
+}
+function raceChangeSpeed(){
+  raceInterval=parseInt(document.getElementById('raceSpeed').value);
+  if(raceTimer){
+    raceStop();
+    document.getElementById('racePlay').textContent='⏸ 일시정지';
+    document.getElementById('racePlay').classList.add('active');
+    raceTimer=setInterval(function(){
+      if(!chartMap['chart1']||!chartMap['chart1'].__raceStep){raceStop();return;}
+      chartMap['chart1'].__raceStep();
+    },raceInterval);
+  }
+}
+window.addEventListener("resize",function(){applyAllMobileChartWidths();});
+window.onload=function(){
+  renderPlanFields();
+  drawChart1(AGG.aggRace);
+  drawChart2(AGG.aggFunc);
+  drawChart3(AGG.aggRank);
+  drawChart4(AGG.aggMonth);
+  drawChart5(AGG.aggTarget);
+  renderTable1(AGG.aggRace);
+  renderTable2(AGG.aggFunc);
+  renderTable3(AGG.aggRank);
+  renderTable4(AGG.aggMonth);
+  renderTable5(AGG.aggTarget);
+  setTimeout(function(){raceAutoStart();},400);
+  setTimeout(function(){applyAllMobileChartWidths();},500);
+};</script></body></html>
